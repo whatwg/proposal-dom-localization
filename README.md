@@ -1,5 +1,6 @@
 # DOM Localization
 
+Stage: 1  
 Author: [Eemeli Aro](https://github.com/eemeli)  
 Previous authors: [Zibi Braniecki](https://github.com/zbraniecki) and [Erik Nordin](https://github.com/nordzilla)
 
