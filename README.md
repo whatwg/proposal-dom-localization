@@ -470,9 +470,3 @@ the identity of the following `<button>` element should be the same:
 ```properties
 submit_form = {#button}Submit{/button}
 ```
-
-<!-- ## Draft Specification -->
-
-## Incubation and/or Standardization Destination
-
-Incubation could be in the W3C i18n WG, standardization in WHATWG HTML.
