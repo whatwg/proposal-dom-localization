@@ -5,6 +5,7 @@ Author: [Eemeli Aro](https://github.com/eemeli)
 Previous authors: [Zibi Braniecki](https://github.com/zbraniecki) and [Erik Nordin](https://github.com/nordzilla)
 
 Presentations:
+
 - [2026 Web Engines Hackfest](https://docs.google.com/presentation/d/11jlGRSi_G0BvBN93pb62NdxEc_6TBuRRWT_aS3tmev0/edit?usp=sharing)
 - [2025 TPAC Breakout Session](https://docs.google.com/presentation/d/1ON2yeocyDSVr8r0cg8ZlhgpFfsvloznq1pJqYSADJs8/edit?usp=sharing)
 - [2023 TPAC Breakout Session](https://docs.google.com/presentation/d/1cvvNcC2jMKztYKFIAg1Q5JPWrMCd0q8Ac2m7P1RYhOc/edit?usp=sharing)
@@ -53,7 +54,7 @@ This has meant that the MessageFormat WG has thus far focused its work on defini
 the [Unicode MessageFormat Standard](https://www.unicode.org/reports/tr35/tr35-messageFormat.html),
 which is now (since March 2025) a stable part of Unicode's LDML specification.
 Thus far, implementations of Unicode MessageFormat are available in Unicode's ICU4C and ICU4J libraries,
-as well as the [`messageformat`](https://github.com/messageformat/messageformat/tree/main/mf2/messageformat) JavaScript package.
+as well as the [`messageformat`](https://www.npmjs.com/package/messageformat) JavaScript package.
 
 The JavaScript implementation of Unicode MessageFormat is tracked as
 the TC39 [Intl.MessageFormat proposal](https://github.com/tc39/proposal-intl-messageformat).
@@ -64,7 +65,7 @@ drawing heavily from experiences in developing, maintaining, and using [Fluent](
 Mozilla's localization system for natural-sounding translations.
 Fluent has also been a significant source of inspiration and experience in the design of Unicode MessageFormat.
 
-The [DOM Overlays rev 3](https://github.com/zbraniecki/fluent-domoverlays-js/wiki/New-Features-(rev-3)) document
+The [Fluent DOM Overlays rev 3](<https://github.com/zbraniecki/fluent-domoverlays-js/wiki/New-Features-(rev-3)>) document
 identifies and enumerates a number of proposed changes to Mozilla's DOM localization system
 that are incorporated in this proposal.
 
@@ -79,7 +80,7 @@ If we were to not consider DOM localization,
 we would leave the standard capability of localizing the web to be a JavaScript feature only.
 
 A number of JavaScript frameworks and libraries for localization exist,
-including [one for Unicode MessageFormat](https://github.com/messageformat/messageformat/tree/main/mf2/messageformat).
+including [one for Unicode MessageFormat](https://www.npmjs.com/package/messageformat).
 However, all such solutions -- including the proposed `Intl.MessageFormat` for JavaScript --
 require localization to be achieved by extra steps and complications that ought not be necessary.
 
@@ -178,7 +179,7 @@ _Localization resources_ declared in the `<head>` element of a document are aggr
 ```html
 <html>
   <head>
-    <link rel="localization" src="uri/for/resource.mf" />
+    <link rel="localization" href="uri/for/resource.mf" />
   </head>
   <body>
     <h1 msg="greeting" msg-username="John"></h1>
@@ -197,7 +198,7 @@ Then the above example would produce a DOM matching the following representation
 ```html
 <html>
   <head>
-    <link rel="localization" src="uri/for/resource.mf" />
+    <link rel="localization" href="uri/for/resource.mf" />
   </head>
   <body>
     <h1 msg="greeting" msg-username="John">Welcome, John</h1>
@@ -384,7 +385,7 @@ combined with multiple separate _message resources_, for each supported locale.
 ```html
 <html lang="en-US" lang-available="en-GB es fi fr">
   <head>
-    <link rel="messages" src="/path/to/{lang}.messages">
+    <link rel="messages" href="/path/to/{lang}.messages" />
   </head>
   <body>
     <div msg="example">
