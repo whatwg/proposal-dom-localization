@@ -376,21 +376,27 @@ it would be useful to explore how a page could advertise which locales it's avai
 and to support live language switching.
 
 As one possibility, including a list of available top-level `lang` values
-and supporting templating would make it possible for language selection functionality
+would make it possible for language selection functionality
 be provided, either as a (new) part of the browser UI, or as a JavaScript API.
+
+Separately, alternative resource URLs could be provided for different locales
+by relying on the `hreflang` attribute of `<link rel="message">` elements,
+and with different resource paths provided for different locales
 
 This would allow for a a localised experience to be provided using a single static HTML,
 combined with multiple separate _message resources_, for each supported locale.
 
 ```html
-<html lang="en-US" lang-available="en-GB es fi fr">
+<html lang="en-US" lang-available="en-GB en-US es fi fr">
   <head>
-    <link rel="messages" href="/path/to/{lang}.messages" />
+    <link rel="messages" href="/path/to/en-US.messages" />
+    <link rel="messages" href="/path/to/en-GB.messages" hreflang="en-GB" />
+    <link rel="messages" href="/path/to/es.messages" hreflang="es" />
+    <link rel="messages" href="/path/to/fi.messages" hreflang="fi" />
+    <link rel="messages" href="/path/to/fr.messages" hreflang="fr" />
   </head>
   <body>
-    <div msg="example">
-      This <a href="/page">color</a> is gray
-    </div>
+    <div msg="example">This <a href="/page">color</a> is gray</div>
   </body>
 </html>
 ```
