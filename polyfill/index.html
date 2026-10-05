@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="fr-CH">
+  <head>
+    <script type="module" blocking="render" src="polyfill.js"></script>
+    <link rel="messages" href="messages.en.json" />
+    <link rel="messages" href="messages.de.json" hreflang="de" />
+    <link rel="messages" href="messages.fr.json" hreflang="fr" />
+  </head>
+  <body>
+    <div msg="foo" msg-opt="fop">foo</div>
+    <hr />
+    <div lang="de" msg="bar" msg-opt="bap">bar</div>
+    <script>
+      const f = document.querySelector("div[msg=foo]");
+      const b = document.querySelector("div[msg=bar]");
+    </script>
+  </body>
+</html>
