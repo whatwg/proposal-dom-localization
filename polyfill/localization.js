@@ -13,6 +13,9 @@ export class Localization {
   /** @type {Document} */
   #doc;
 
+  /** @type {Set<HTMLElement>} */
+  #badLangElements = new WeakSet();
+
   /** @type {Map<string, string[]>} */
   #langMap = new Map();
   /** @type {Map<string, HTMLLinkElement[]>} */
@@ -49,14 +52,26 @@ export class Localization {
     this.#linkMap.clear();
     for (const link of this.#doc.head.querySelectorAll("link[rel=messages]")) {
       if (link.translate) {
-        const lang = link.hreflang.toLowerCase();
-        this.#linkMap.getOrInsert(lang, []).unshift(link);
+        try {
+          const lang = asLocaleId(link.hreflang);
+          this.#linkMap.getOrInsert(lang, []).unshift(link);
+        } catch {
+          console.error(`Invalid hreflang: ${link.hreflang}`);
+        }
       }
     }
 
     this.#langMap.clear();
     for (const el of this.#doc.querySelectorAll("[lang]")) {
-      this.#langMap.getOrInsert(el.lang.toLowerCase(), []);
+      try {
+        this.#langMap.getOrInsert(asLocaleId(el.lang), []);
+      } catch {
+        if (!this.#badLangElements.has(el)) {
+          this.#badLangElements.add(el);
+          console.error(`Invalid lang: ${el.lang}`);
+        }
+        this.#langMap.getOrInsert("", []);
+      }
     }
     for (let [lang, hreflangs] of this.#langMap.entries()) {
       // TODO: Do proper locale negotiation
@@ -79,7 +94,13 @@ export class Localization {
   #loadLinks(langs) {
     return Promise.allSettled(
       Array.from(this.#doc.head.querySelectorAll("link[rel=messages]"))
-        .filter((link) => langs.has(link.hreflang.toLowerCase()))
+        .filter((link) => {
+          try {
+            return link.translate && langs.has(asLocaleId(link.hreflang));
+          } catch {
+            console.error(`Invalid hreflang: ${link.hreflang}`);
+          }
+        })
         .map(async (link) => {
           if (this.#resources.has(link.href)) return;
           try {
@@ -100,13 +121,12 @@ export class Localization {
     );
   }
 
-  /** @param {HTMLElement} el */
-  getMessage(el) {
+  /**
+   * @param {string} lang
+   * @param {string[]} msgId
+   */
+  #getMessage(lang, msgId) {
     let loadLang = null;
-    if (!el.translate) return { message: undefined, loadLang };
-    /** @type {string[]} */
-    const msgId = el.msg.split(".");
-    const lang = el.closest("[lang]")?.lang.toLowerCase() ?? "";
     const msgLangs = this.#langMap.get(lang) ?? this.#langMap.get("") ?? [];
     for (const msgLang of msgLangs) {
       for (const link of this.#linkMap.get(msgLang)) {
@@ -146,8 +166,22 @@ export class Localization {
     const loadLangs = new Set();
     const refresh = new Set();
     for (const el of msgElements) {
-      if (!el.msg) continue;
-      const { message, loadLang } = this.getMessage(el);
+      if (!el.msg || !el.translate) continue;
+      let lang;
+      const langRoot = el.closest("[lang]");
+      if (langRoot) {
+        try {
+          lang = asLocaleId(langRoot.lang);
+        } catch {
+          if (!this.#badLangElements.has(langRoot)) {
+            this.#badLangElements.add(langRoot);
+            console.error(`Invalid lang: ${langRoot.lang}`);
+          }
+          lang = "";
+        }
+      }
+      const msgId = el.msg.split(".");
+      const { message, loadLang } = this.#getMessage(lang, msgId);
       if (message) {
         const opts = el.msgOpts.size
           ? Object.fromEntries(el.msgOpts)
@@ -255,6 +289,17 @@ function getMsgElements(mutations) {
     }
   }
   return msgElements;
+}
+
+/**
+ * Validate and canonicalize a locale identifier
+ *
+ * @param {string | undefined} lang
+ */
+function asLocaleId(lang) {
+  if (!lang) return "";
+  const locale = new Intl.Locale(lang);
+  return locale.minimize().toString();
 }
 
 /**
