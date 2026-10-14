@@ -1,15 +1,16 @@
 {
   "name": "dom-l10n-polyfill",
-  "version": "0.0.1",
+  "private": true,
   "description": "Polyfill for DOM Localization",
   "license": "Apache-2.0",
   "author": "Eemeli Aro <eemeli@mozilla.com>",
   "type": "module",
-  "main": "dom-l10n.js",
+  "main": "localization.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@messageformat/resource": "0.1.0",
     "messageformat": "^4.0.0"
   }
 }

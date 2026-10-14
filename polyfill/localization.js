@@ -1,3 +1,12 @@
+import {
+  compileMessageResource,
+  parseMessageResource,
+} from "@messageformat/resource";
+
+/**
+ * @import { MessageFormatWrapper, MessageResource } from "@messageformat/resource"
+ */
+
 const msgObserverOptions = { attributes: true, childList: true, subtree: true };
 
 export class Localization {
@@ -8,8 +17,10 @@ export class Localization {
   #langMap = new Map();
   /** @type {Map<string, HTMLLinkElement[]>} */
   #linkMap = new Map();
-  /** @type {Map<string, any>} */
+  /** @type {Map<string, MessageResource>} */
   #resources = new Map();
+  /** @type {Map<MessageResource, Map<string, MessageFormatWrapper>>} */
+  #formatters = new Map();
 
   #langObserver = new MutationObserver(langCallback);
   #linkObserver = new MutationObserver(linkCallback);
@@ -73,15 +84,14 @@ export class Localization {
             // FIXME: Should also handle crossorigin, integrity, and referrerpolicy
             const res = await fetch(link.href);
             if (!res.ok) throw new Error(res.statusText);
-            // FIXME: Parse as MF2 resource, not JSON
-            const json = await res.json();
-            this.#resources.set(link.href, json);
+            const src = await res.text();
+            const msgRes = parseMessageResource(src);
+            this.#resources.set(link.href, msgRes);
             link.dispatchEvent(new Event("load"));
-            console.log("LOAD", link.href, json);
+            console.log("LOAD", link.href, msgRes);
           } catch (error) {
-            console.error(
-              `Loading messages from ${link.href} failed: ${error}`,
-            );
+            const err = `Loading messages from ${link.href} failed: ${error}`;
+            console.error(err);
             this.#resources.set(link.href, null);
           }
         }),
@@ -90,7 +100,8 @@ export class Localization {
 
   /** @param {HTMLElement} el */
   getMessage(el) {
-    const msg = el.msg;
+    /** @type {string[]} */
+    const msgId = el.msg.split(".");
     const lang = el.closest("[lang]")?.lang.toLowerCase() ?? "";
     const msgLangs = this.#langMap.get(lang) ?? this.#langMap.get("") ?? [];
     let loadLang = null;
@@ -100,12 +111,21 @@ export class Localization {
         const resource = this.#resources.get(link.href);
         if (resource === undefined) {
           loadLang ??= msgLang;
-        } else if (resource && msg in resource) {
-          return { message: resource[msg], loadLang };
+        } else if (resource && resource.has(msgId[0])) {
+          /** @type {Map<string, MessageFormatWrapper>} */
+          const mfRes = this.#formatters.getOrInsertComputed(resource, () =>
+            compileMessageResource(resource, {
+              /* TODO: message constructor options */
+            }),
+          );
+          /** @type {MessageFormatWrapper | undefined} */
+          let message = mfRes;
+          for (const idPart of msgId) message = message?.get(idPart);
+          return { message, loadLang };
         }
       }
     }
-    return { message: `{${msg}}`, loadLang };
+    return { message: undefined, loadLang };
   }
 
   /**
@@ -123,14 +143,37 @@ export class Localization {
     const loadLangs = new Set();
     const refresh = new Set();
     for (const el of msgElements) {
-      if (el.msg) {
-        const res = this.getMessage(el);
-        console.log("MSG", el.msg, el.msgOpts, res);
-        el.innerText = res.message;
-        if (res.loadLang !== null) {
-          loadLangs.add(res.loadLang);
-          refresh.add(el);
+      if (!el.msg) continue;
+      const { message, loadLang } = this.getMessage(el);
+      if (message) {
+        const opts = el.msgOpts.size
+          ? Object.fromEntries(el.msgOpts)
+          : undefined;
+        if (message.value) {
+          try {
+            console.log("FMT", el.msg, opts);
+            el.innerText = message.value.format(opts, warnOnFallback(el.msg));
+          } catch (cause) {
+            const errMsg = `Fatal: Formatting message ${el.msg} failed`;
+            console.error(new Error(errMsg, { cause }));
+            el.innerText = `{${el.msg}}`;
+          }
         }
+        for (const [name, prop] of message) {
+          if (prop.value && isTranslatableAttribute(el, name)) {
+            try {
+              const val = prop.value.format(opts, warnOnFallback(el.msg, name));
+              el.setAttribute(name, val);
+            } catch (cause) {
+              const errMsg = `Fatal: Formatting message ${el.msg}.${name} failed`;
+              console.error(new Error(errMsg, { cause }));
+            }
+          }
+        }
+      }
+      if (loadLang !== null) {
+        loadLangs.add(loadLang);
+        refresh.add(el);
       }
     }
 
@@ -209,4 +252,66 @@ function getMsgElements(mutations) {
     }
   }
   return msgElements;
+}
+
+/**
+ * @param {string} msgId
+ * @param {string} attributeName
+ */
+function warnOnFallback(msgId, attributeName = "") {
+  return (cause) => {
+    const msgId_ = attributeName ? `${msgId}.${attributeName}` : msgId;
+    const message = `Formatting message ${msgId_} used fallback`;
+    cause.stack = "";
+    const error = new Error(message, { cause });
+    error.stack = "";
+    console.warn(error);
+  };
+}
+
+/**
+ * As defined by https://html.spec.whatwg.org/#translatable-attributes
+ *
+ * @param {HTMLElement} el
+ * @param {string} name
+ */
+function isTranslatableAttribute(el, name) {
+  const tag = el.tagName;
+
+  switch (name) {
+    case "lang": // must be "translated" to match the language used in the translation
+    case "style": // must be parsed and recursively processed (e.g. for the values of 'content' properties)
+    case "title":
+      return true;
+
+    case "abbr":
+      // Alternative label to use for the header cell when referencing the cell in other contexts
+      return tag === "TH";
+    case "alt":
+      return tag === "AREA" || tag === "IMG" || tag === "INPUT";
+    case "content":
+      return (
+        tag === "META" &&
+        // TODO: Clarify in spec whether these are actually "known to be translatable"
+        ((el.name === "application-name" && !el.hasAttribute("lang")) ||
+          el.name === "description" ||
+          el.name === "keywords")
+      );
+    case "download":
+      // Whether to download the resource instead of navigating to it, and its filename if so
+      return tag === "A" || tag === "AREA";
+    case "label":
+      return tag === "OPTGROUP" || tag === "OPTION" || tag === "TRACK";
+    case "placeholder":
+      return tag === "INPUT" || tag === "TEXTAREA";
+    case "srcdoc":
+      // A document to render in the iframe
+      // must be parsed and recursively processed
+      // TODO: This should probably not be localized.
+      return tag === "IFRAME";
+    case "value":
+      return tag === "INPUT" && (el.type === "button" || el.type === "reset");
+    default:
+      return false;
+  }
 }

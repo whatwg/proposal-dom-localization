@@ -1,18 +1,32 @@
 <!doctype html>
 <html lang="fr-CH">
   <head>
+    <meta charset="utf-8" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@messageformat/resource": "./node_modules/@messageformat/resource/lib/index.js",
+          "messageformat": "./node_modules/messageformat/lib/index.js"
+        }
+      }
+    </script>
     <script type="module" blocking="render" src="polyfill.js"></script>
-    <link rel="messages" href="messages.en.json" />
-    <link rel="messages" href="messages.de.json" hreflang="de" />
-    <link rel="messages" href="messages.fr.json" hreflang="fr" />
+    <link rel="messages" href="messages.en.msg" />
+    <link rel="messages" href="messages.fr.msg" hreflang="fr" />
   </head>
   <body>
     <div msg="foo" msg-opt="fop">foo</div>
     <hr />
-    <div lang="de" msg="bar" msg-opt="bap">bar</div>
+    <div msg="bar" msg-opt="bap" lang="en">bar</div>
+    <hr />
+    <div msg="baz">baz</div>
+    <hr />
+    <div msg="inner.group.foo">inner</div>
     <script>
       const f = document.querySelector("div[msg=foo]");
       const b = document.querySelector("div[msg=bar]");
+      const z = document.querySelector("div[msg=baz]");
+      const i = document.querySelector("div[msg='inner.group.foo']");
     </script>
   </body>
 </html>
