@@ -415,9 +415,9 @@ example = This {#a}colour{/a} is grey
 example = Tämä {#a}väri{/a} on harmaa
 ```
 
-If a server is available that can serve different contents
-depending on the request's `Accept-Language` header,
-that could also provide a way to handle locale negotiation.
+If the content is served, a request for a message resource file
+can be language negotiated to return the correctly localized resource file.
+For example, such a server might return a file based on the `Accept-Language` header.
 With such an approach, the HTML contents of the page would not need to
 include multiple `<link rel="message" hreflang="...">` elements
 in order to support multiple localizations.
