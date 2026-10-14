@@ -415,6 +415,13 @@ example = This {#a}colour{/a} is grey
 example = Tämä {#a}väri{/a} on harmaa
 ```
 
+If a server is available that can serve different contents
+depending on the request's `Accept-Language` header,
+that could also provide a way to handle locale negotiation.
+With such an approach, the HTML contents of the page would not need to
+include multiple `<link rel="message" hreflang="...">` elements
+in order to support multiple localizations.
+
 ## Caveats and Shortcomings, and other drawbacks of design choices, both current and any prior iterations
 
 ### Resource Loading May be Slow
