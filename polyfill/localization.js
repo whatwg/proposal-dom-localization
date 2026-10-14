@@ -34,7 +34,7 @@ export class Localization {
     await this.loadResources();
     this.#langObserver.observe(this.#doc, {
       attributes: true,
-      attributeFilter: ["lang"],
+      attributeFilter: ["lang", "translate"],
       subtree: true,
     });
     this.#linkObserver.observe(this.#doc.head, {
@@ -48,8 +48,10 @@ export class Localization {
   async loadResources() {
     this.#linkMap.clear();
     for (const link of this.#doc.head.querySelectorAll("link[rel=messages]")) {
-      const lang = link.hreflang.toLowerCase();
-      this.#linkMap.getOrInsert(lang, []).unshift(link);
+      if (link.translate) {
+        const lang = link.hreflang.toLowerCase();
+        this.#linkMap.getOrInsert(lang, []).unshift(link);
+      }
     }
 
     this.#langMap.clear();
@@ -100,11 +102,12 @@ export class Localization {
 
   /** @param {HTMLElement} el */
   getMessage(el) {
+    let loadLang = null;
+    if (!el.translate) return { message: undefined, loadLang };
     /** @type {string[]} */
     const msgId = el.msg.split(".");
     const lang = el.closest("[lang]")?.lang.toLowerCase() ?? "";
     const msgLangs = this.#langMap.get(lang) ?? this.#langMap.get("") ?? [];
-    let loadLang = null;
     for (const msgLang of msgLangs) {
       for (const link of this.#linkMap.get(msgLang)) {
         // null if load failed

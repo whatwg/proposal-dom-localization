@@ -19,14 +19,16 @@
     <hr />
     <div msg="bar" msg-opt="bap" lang="en">bar</div>
     <hr />
-    <div msg="baz">baz</div>
+    <div translate="no">
+      <span msg="baz">baz</span>
+    </div>
     <hr />
     <div msg="inner.group.foo">inner</div>
     <script>
-      const f = document.querySelector("div[msg=foo]");
-      const b = document.querySelector("div[msg=bar]");
-      const z = document.querySelector("div[msg=baz]");
-      const i = document.querySelector("div[msg='inner.group.foo']");
+      const f = document.querySelector("[msg=foo]");
+      const b = document.querySelector("[msg=bar]");
+      const z = document.querySelector("[msg=baz]");
+      const i = document.querySelector("[msg='inner.group.foo']");
     </script>
   </body>
 </html>
