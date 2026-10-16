@@ -227,8 +227,12 @@ Continuing with the same example, changing the header contents would be possible
 
 ```js
 let h1 = document.querySelector("h1");
-h1.l10n.set("greeting", { username: "Mary" });
+h1.msg = ["greeting", { username: "Mary" }];
 ```
+
+The use of an array value here is shorthand for setting the _message identifier_ and
+arguments for the message's formatting simultaneously,
+to avoid an intermediate formatting of the message contents with a fallback value for the `$username`.
 
 The formatted title would also be accessible directly in JavaScript:
 
