@@ -369,7 +369,7 @@ The above example would produce the following DOM after localization:
 </div>
 ```
 
-### Resource Loading and Content Negotiation
+### Negotiating and Loading Resources
 
 It should be possible for DOM Localization to support live language switching,
 as well as supporting the localization of a page where
