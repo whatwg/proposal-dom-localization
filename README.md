@@ -374,7 +374,7 @@ The above example would produce the following DOM after localization:
 It should be possible for DOM Localization to support live language switching,
 as well as supporting the localization of a page where
 different localized elements have different languages.
-This would allow for a a localised experience to be provided using a single static HTML,
+This would allow for a localized experience to be provided using a single static HTML,
 combined with multiple separate _message resources_, for each supported locale.
 
 To effect this, the [language](https://html.spec.whatwg.org/#language)
@@ -404,10 +404,14 @@ additional attributes beyond `href` will be required on `<link rel=messages>`:
 
 - `langavailable`: A set of space-separated locale identifiers
   that are available for the page's localization.
-  If not set, all locale identifiers are accepted.
+  This enables client-side language negotiation,
+  which may reduce fingerprinting.
+  If not set, the preferred locale and its fallback chain
+  are set directly by the element's language. 
 
 - `langfallback`: A single locale identifier to use as the ultimate fallback.
-  By default, this would be `und`, the root or unknown locale.
+  By default, this would be the root or unknown locale,
+  often represented as `und` or the empty string.
 
 A `<link rel=message>` would need to have either an `href` or `hreftemplate` attribute,
 but never both.
@@ -430,7 +434,9 @@ so e.g. starting with `'ar-ae-u-nu-latn'` we end up with:
 
 Note the capitalization changes in `lang_region`,
 and the determination of `lang_script` from the language & region.
-The canonicalisation may also change the language subtag, as e.g. `iw` canonicalises as `he`.
+The canonicalization may also change a deprecated subtag
+to its Preferred-Value in the subtag registry. 
+For example, the language subtag, as e.g. `iw` canonicalises as `he`.
 
 This could be used for instance as
 
@@ -445,7 +451,9 @@ and maximised (`ar-eg` → `ar-Arab-EG`) representations of the locale identifie
 
 #### Locale Fallback
 
-By default, the fallback chain of locales to try until something other than a 404 is received would be:
+A request for a message resource file
+should follow the fallback chain of locales until something other than a 404 is received.
+The default fallback chain would be:
 
 1. The lang, as given (e.g. `ar-Arab-AE-u-nu-Latn`).
 2. The lang, with subtags removed one at at time from the end,
