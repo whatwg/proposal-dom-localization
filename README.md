@@ -179,7 +179,7 @@ _Localization resources_ declared in the `<head>` element of a document are aggr
 ```html
 <html>
   <head>
-    <link rel="localization" href="uri/for/resource.mf" />
+    <link rel="messages" href="uri/for/resource.msg" />
   </head>
   <body>
     <h1 msg="greeting" msg-username="John"></h1>
@@ -198,7 +198,7 @@ Then the above example would produce a DOM matching the following representation
 ```html
 <html>
   <head>
-    <link rel="localization" href="uri/for/resource.mf" />
+    <link rel="messages" href="uri/for/resource.msg" />
   </head>
   <body>
     <h1 msg="greeting" msg-username="John">Welcome, John</h1>
@@ -373,45 +373,294 @@ The above example would produce the following DOM after localization:
 </div>
 ```
 
-### Language Availability and Switching
+### Negotiating and Loading Resources
 
-As a part of this work, or in parallel with it,
-it would be useful to explore how a page could advertise which locales it's available in,
-and to support live language switching.
-
-As one possibility, including a list of available top-level `lang` values
-and supporting templating would make it possible for language selection functionality
-be provided, either as a (new) part of the browser UI, or as a JavaScript API.
-
-This would allow for a a localised experience to be provided using a single static HTML,
+It should be possible for DOM Localization to support live language switching,
+as well as supporting the localization of a page where
+different localized elements have different languages.
+This would allow for a localized experience to be provided using a single static HTML,
 combined with multiple separate _message resources_, for each supported locale.
 
+To effect this, the [language](https://html.spec.whatwg.org/#language)
+of each element with a `msg` attribute
+is taken into account when resolving `<link rel=messages>` references.
+Note that this language is set by e.g. `lang` attributes on parent elements,
+and is often different from the `navigator.language` value.
+
+To ensure that a server is able to incorporate the language in the content negotiation it performs,
+the [Accept-Language] header value will need to be set differently than usual
+when resolving `<link rel=messages>` references.
+It may be much more specific than usual, as its values can be set by the page
+rather than being determined from user preferences.
+
+[Accept-Language]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Accept-Language
+
+#### Link Attributes
+
+In order to account for servers that are not able to make use of Accept-Language,
+as well as usage with `file:` and otherwise,
+additional attributes beyond `href` will be required on `<link rel=messages>`:
+
+- `hreftemplate`: An alternative to the `href` value,
+  which would contain an [URL Pattern](https://urlpattern.spec.whatwg.org/) value.
+  This would be used as a template together with the locale identifier
+  to put together a corresponging URL value.
+
+- `langavailable`: A set of space-separated locale identifiers
+  that are available for the page's localization.
+  This enables client-side language negotiation,
+  which may reduce fingerprinting.
+  If not set, the preferred locale and its fallback chain
+  are set directly by the element's language. 
+
+- `langfallback`: A single locale identifier to use as the ultimate fallback.
+  By default, this would be the root or unknown locale,
+  often represented as `und` or the empty string.
+
+A `<link rel=message>` would need to have either an `href` or `hreftemplate` attribute,
+but never both.
+
+In an `hreftemplate` value, only the following placeholders would be available:
+
+- `:lang`: The complete locale identifier in its original spelling
+- `:lang_lang`: The language subtag of the canonicalized locale identifier
+- `:lang_script`: The script subtag of the canonicalized locale identifier
+- `:lang_region`: The region subtag of the canonicalized locale identifier
+
+A placeholder may be delimited as `{:lang}` to distinguish it from trailing word characters.
+
+Except for `:lang`, the locale identifier values are canonicalized and maximised,
+so e.g. starting with `'ar-ae-u-nu-latn'` we end up with:
+
+```js
+{ lang: 'ar-ae-u-nu-latn', lang_lang: 'ar', lang_script: 'Arab', lang_region: 'AE' }
+```
+
+Note the capitalization changes in `lang_region`,
+and the determination of `lang_script` from the language & region.
+The canonicalization may also change a deprecated subtag
+to its Preferred-Value in the subtag registry. 
+For example, the language subtag, as e.g. `iw` canonicalises as `he`.
+
+This could be used for instance as
+
 ```html
-<html lang="en-US" lang-available="en-GB es fi fr">
+<link rel="messages" hreftemplate="/locale/{:lang_lang}_{:lang_region}.msg" />
+```
+
+Using any other placeholder than the above is an error,
+though we could consider also supporting e.g. `:lang_canon`, `:lang_min`, `:lang_max`
+to provide the canonical (e.g. `ar-eg` → `ar-EG`), minimised (`ar-eg` → `ar`),
+and maximised (`ar-eg` → `ar-Arab-EG`) representations of the locale identifier.
+
+#### Locale Fallback
+
+A request for a message resource file
+should follow the fallback chain of locales until something other than a 404 is received.
+The default fallback chain would be:
+
+1. The lang, as given (e.g. `ar-Arab-AE-u-nu-Latn`).
+2. The lang, with subtags removed one at at time from the end,
+   while taking any [BCP 47 Suppress-Script] fields into account (`ar-Arab-AE`, `ar-AE`, `ar`).
+3. The root locale, `und`.
+   Note that this currently maximizes to `en-Latn-US`,
+   so its `:lang_lang` value would be `en` while its `:lang` value would be `und`.
+
+[BCP 47 Suppress-Script]: https://www.rfc-editor.org/info/rfc5646/#section-3.1.9
+
+If templating results in the same URL more than once, those are deduplicated.
+
+Following the CLDR parent chain would not be supported,
+so for `en-GB` we'd not try `en-150` and `en-001` before falling back to `en`,
+or fall back from `hi-Latn` to `en-IN`.
+These relationships are liable to change at any time, and are very difficult to reason about.
+
+To customize and limit the locale resolution,
+a `<link rel=messages>` may have a `langavailable` attribute,
+which should contain a space-separated list of locale identifiers
+that should be allowed as lang values.
+For example, with
+
+```html
+<link
+  rel="messages"
+  hreftemplate="/locale/:lang/common.msg"
+  langavailable="ar ar-ae fr it"
+/>
+```
+
+the locales to try from the example above would be filtered
+only to the available locales that are supersets of the requested or fallback locale,
+and then mapped to the strictest matching available locale.
+In this case, starting with `ar-Arab-AE-u-nu-Latn` we'd end up with the following URLs to try:
+
+1. `/locale/ar-ae/common.msg` (from `ar-Arab-AE-u-nu-Latn`, `ar-Arab-AE`, and `ar-AE`)
+2. `/locale/ar/common.msg`
+
+If the `langavailable` attribute were not set,
+the following URLs would be attempted instead:
+
+1. `/locale/ar-Arab-AE-u-nu-Latn/common.msg`
+2. `/locale/ar-Arab-AE/common.msg`
+3. `/locale/ar-AE/common.msg`
+4. `/locale/ar/common.msg`
+5. `/locale/und/common.msg`
+
+To customize the ultimate fallback value from its `und` default,
+the `langfallback` attribute may be set.
+With
+
+```html
+<link
+  rel="messages"
+  hreftemplate="/locale/:lang/common.msg"
+  langavailable="ar ar-ae fr it"
+  langfallback="it"
+/>
+```
+
+the lookup chain from `ar-Arab-AE-u-nu-Latn` would end up as:
+
+1. `/locale/ar-ae/common.msg`
+2. `/locale/ar/common.msg`
+3. `/locale/it/common.msg`
+
+#### Accept-Language
+
+For message resource requests,
+the `Accept-Language` HTTP header should always be set by the language of the element,
+i.e. _not_ the same value as the page itself was requested with.
+When we're processing a `<link rel=message>`,
+content negotiation between the client and the server has already occurred for the page,
+and we're now within that page's context.
+
+The header value should always use the same sequence of locale identifiers
+as used for `hreftemplate`,
+though with its catchall `*` being used by default as the ultimate fallback locale
+rather than `und`.
+
+Within the page, if we end up with e.g.
+
+```html
+<html lang="fr">
   <head>
-    <link rel="messages" href="/path/to/{lang}.messages" />
+    <link
+      rel="messages"
+      href="/locale/common.msg"
+      langavailable="ar ar-ae fr it"
+    />
+    ...
+    <body>
+      <div lang="ar-Arab-AE-u-nu-Latn">
+        <span msg="some-message"></span>
+      </div>
+    </body>
   </head>
-  <body>
-    <div msg="example">
-      This <a href="/page">color</a> is gray
-    </div>
-  </body>
 </html>
 ```
 
-```properties
-# /path/to/en-GB.messages
-@locale en-GB
+then the request we generate should end up as something like
 
-example = This {#a}colour{/a} is grey
+```
+GET /locale/common.msg HTTP/1.1
+...
+Accept-Language: ar-ae, ar;q=0.9
 ```
 
-```properties
-# /path/to/fi.messages
-@locale fi
+Note that here we're using `href` rather than `hreftemplate`,
+but still making use of `langavailable`.
+Without that attribute, the request would end up as:
 
-example = Tämä {#a}väri{/a} on harmaa
 ```
+GET /locale/common.msg HTTP/1.1
+...
+Accept-Language: ar-Arab-AE-u-nu-Latn, ar-Arab-AE;q=0.9, ar-Arab;q=0.8, ar;q=0.7, *;q=0.6
+```
+
+This is a much more detailed value than usual,
+but that's possible here because it's set based on values in the page,
+and not from user preferences.
+
+In this context, the final `und` maps quite naturally to the field's `*` wildcard,
+which is left out from the `langavailable` -filtered request
+as the page itself is declaring that the listed locales _are_ available.
+
+With `hreftemplate` and a templated URL that with its fallback chain ends up with more than one URL to try,
+the `Accept-Language` header would be the same for all of them.
+
+#### Render Blocking and Incomplete Localizations
+
+Given the capabilities for setting, mapping and filtering the locale identifier that are provided,
+a client should not need to to request more than one message resource at a time per `<link rel=messages>`.
+
+For the same reason, render blocking should only be required for the first request.
+This does allow for the possibility of a "flash of unlocalized content",
+but this can be avoided by appropriate use of templating,
+`langavailable` filtering and mapping,
+and/or serverside content negotiation.
+
+More than one request is required when a localization is incomplete,
+and does not contain all of the expected messages.
+This is most often due to a translation not being up-to-date,
+but it may also be intentional: for example,
+a `fr-CH` localization could be a thin layer
+changing only a few messages on top of a `fr` localization.
+Avoiding a flash of unlocalized content for these cases would require one of the following:
+
+1. Build-time tooling
+   that layers the source message data appropriately into a single message resource.
+   This is only really applicable when the locales share the same language,
+   or at the very least use the same pluralisation rules.
+2. Client (and server) support for a new multipart media type
+   that could include multiple message resources in a single response.
+3. Locale layering being a feature supported by the message resource syntax.
+   At the moment, a message resource declares a single locale for all its contents,
+   but this could theoretically be extended as:
+
+   ```
+   @locale en
+   ---
+   one = [First message in English]
+   two = [Second message in English]
+   three = [Third message in English]
+   four = [Fourth message in English]
+   ...
+   @locale fr
+   ---
+   two = [Second message in French]
+   three = [Third message in French]
+   ...
+   @locale fr-CH
+   ---
+   one = [First message in Swiss French]
+   two = [Second message in Swiss French]
+   ```
+
+   Where the `...` document separator is introduced,
+   borrowing again from YAML as was done for the `---` header separator.
+   Applying messages from this resource would use
+   `fr-CH` for `one` and `two`, `fr` for `three`, and `en` for `four`
+   (message definitions in later parts override earlier ones).
+
+   Adding such support to the format would be a bit of a crutch, though,
+   as this functionality wouldn't really ever be used by humans who work with the files,
+   but only as a build-process output.
+
+Fallback between locales for individual messages ought to be considered as a form of exception handling.
+With that viewpoint, having a first render get updated with a second one
+after the fallback locale's messages are fetched is acceptable.
+
+### Language Switching
+
+As a part of this work, or in parallel with it,
+it would be useful to explore whether and how a browser could provide a UI for language switching.
+Already now browsers detect when a page is in a different language than the user's preference,
+and offer to provide a machine translation of it,
+or even do so automatically.
+
+If a page itself advertises e.g. via `<link rel="messages" langavailable>`
+that its localization is available in a set of languages,
+these could and should be preferred over machine translation.
 
 ## Caveats and Shortcomings, and other drawbacks of design choices, both current and any prior iterations
 
@@ -420,7 +669,8 @@ example = Tämä {#a}väri{/a} on harmaa
 _Localization resources_ that are loaded from external files will need to be processed asynchronously.
 This means that document rendering could experience a "flash of unlocalized content",
 much like a [flash of unstyled content](https://en.wikipedia.org/wiki/Flash_of_unstyled_content).
-This will need to be similarly addressed.
+This will need to be similarly addressed,
+and the page's first render blocked until the message resources are available.
 
 ### Fallback Behaviour Needs Consideration
 
